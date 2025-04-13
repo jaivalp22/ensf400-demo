@@ -1,78 +1,104 @@
+// This jenkinsfile is used to run CI/CD on my local (Windows) box, no VM's needed.
+
 pipeline {
+
   agent any
 
-  environment {
-    HTTP_PROXY = 'http://127.0.0.1:9888'
-  }
+   environment {
+        // This is set so that the Python API tests will recognize it
+        // and go through the Zap proxy waiting at 9888
+        HTTP_PROXY = 'http://127.0.0.1:9888'
+        // Default Java Home for Jenkins (JDK 17)
+        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
+        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+   }
 
   stages {
-    stage('Set JAVA_HOME Dynamically') {
-      steps {
-        script {
-          echo 'Detecting Java path...'
-          // Find Java path dynamically
-          def javaPath = sh(script: "readlink -f \$(which java) | sed 's:/bin/java::'", returnStdout: true).trim()
-          env.JAVA_HOME = javaPath
-          echo "Detected JAVA_HOME: ${env.JAVA_HOME}"
-        }
-      }
-    }
 
-    stage('Check Java Installation') {
-      steps {
-        script {
-          echo "JAVA_HOME is: ${env.JAVA_HOME}"
-          def javaVersion = sh(script: "${env.JAVA_HOME}/bin/java -version 2>&1", returnStdout: true).trim()
-          echo "Java version:\n${javaVersion}"
-        }
-      }
-    }
-
+    // build the war file (the binary).  This is the only
+    // place that happens.
     stage('Build') {
+      environment {
+        // Override JAVA_HOME to use JDK 11 for this stage
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+      }
       steps {
-        echo 'Running Gradle build...'
         sh './gradlew clean assemble'
       }
     }
 
+    // run all the unit tests - these do not require anything else
+    // to be running and most run very quickly.
     stage('Unit Tests') {
+      environment {
+        // Override JAVA_HOME to use JDK 11 for this stage
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+      }
       steps {
-        echo 'Running Unit Tests...'
         sh './gradlew test'
       }
+      post {
+        always {
+          junit 'build/test-results/test/*.xml'
+        }
+      }
     }
 
+    // run the tests which require connection to a
+    // running database.
     stage('Database Tests') {
+      environment {
+        // Override JAVA_HOME to use JDK 11 for this staged
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+      }
       steps {
-        echo 'Running Database Tests...'
-        sh './gradlew dbTest'
+        sh './gradlew integrate'
+      }
+      post {
+        always {
+          junit 'build/test-results/integrate/*.xml'
+        }
       }
     }
 
+    // These are the Behavior Driven Development (BDD) tests
+    // See the files in src/bdd_test
+    // These tests do not require a running system.
     stage('BDD Tests') {
-      steps {
-        echo 'Running BDD Tests...'
-        sh './gradlew bddTest'
+      environment {
+        // Override JAVA_HOME to use JDK 11 for this stage
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
       }
+      steps {
+        sh './gradlew generateCucumberReports'
+        // generate the code coverage report for jacoco
+        sh './gradlew jacocoTestReport'
+      }
+      post {
+          always {
+            junit 'build/test-results/bdd/*.xml'
+          }
+        }
     }
 
+    // Runs an analysis of the code, looking for any
+    // patterns that suggest potential bugs.
     stage('Static Analysis') {
-      steps {
-        echo 'Running Static Code Analysis...'
-        sh './gradlew check'
+        environment {
+          // Override JAVA_HOME to use JDK 11 for this stage
+          JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64' 
+          PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+        }      
+      
+      steps{
+        sh './gradlew sonarqube -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login="admin" -Dsonar.password="ensf400"'
       }
-    }
-  }
-
-  post {
-    always {
-      echo 'Pipeline execution completed.'
-    }
-    success {
-      echo 'Build successful!'
-    }
-    failure {
-      echo 'Build failed. Please check logs for more details.'
     }
   }
 }
+
+// test to see if webhook is working again
