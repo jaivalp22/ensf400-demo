@@ -18,11 +18,6 @@ pipeline {
     // build the war file (the binary).  This is the only
     // place that happens.
     stage('Build') {
-      environment {
-        // Override JAVA_HOME to use JDK 11 for this stage
-        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk'
-        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
-      }
       steps {
         sh './gradlew clean assemble'
       }
