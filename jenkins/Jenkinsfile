@@ -50,7 +50,7 @@ pipeline {
     // running database.
     stage('Database Tests') {
       environment {
-        // Override JAVA_HOME to use JDK 11 for this stage
+        // Override JAVA_HOME to use JDK 11 for this staged
         JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
         PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
       }
@@ -90,7 +90,7 @@ pipeline {
     stage('Static Analysis') {
         environment {
           // Override JAVA_HOME to use JDK 11 for this stage
-          JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+          JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64' 
           PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
         }      
       
